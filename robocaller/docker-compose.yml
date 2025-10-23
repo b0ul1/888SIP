@@ -1,7 +1,8 @@
-version: '3.9'
 services:
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     container_name: robotcaller_api
     ports:
       - "8000:8000"
@@ -10,37 +11,51 @@ services:
       - postgres
       - redis
       - asterisk
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: robotcaller_worker
+    command: celery -A worker.tasks.celery_app worker --loglevel=info
+    depends_on:
+      - redis
+      - api
+    volumes:
+      - .:/app
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: robotcaller_frontend
     ports:
       - "7331:7331"
     environment:
       - API_URL=http://localhost:8000
+    depends_on:
+      - api
 
   postgres:
     image: postgres:16
-    container_name: robotcaller_db
+    container_name: robotcaller_postgres
     environment:
       POSTGRES_USER: caller
       POSTGRES_PASSWORD: caller
       POSTGRES_DB: robotcaller
     volumes:
       - db_data:/var/lib/postgresql/data
+    ports:
+      - "54322:54322"
 
   redis:
     image: redis:7
     container_name: robotcaller_redis
-
-  worker:
-    build: .
-    container_name: robotcaller_worker
-    command: celery -A worker.celery_app worker --loglevel=info
-    depends_on:
-      - redis
-      - api
+    ports:
+      - "6379:6379"
 
   asterisk:
     image: andrius/asterisk
@@ -49,8 +64,9 @@ services:
       - "5060:5060/udp"
       - "8088:8088"
     volumes:
-      - ./pjsip.conf:/etc/asterisk/pjsip.conf
-      - ./sounds:/var/lib/asterisk/sounds
+      - ./asterisk/ari.conf:/etc/asterisk/ari.conf
+      - ./asterisk/pjsip.conf:/etc/asterisk/pjsip.conf
+      - ./voice/sounds:/var/lib/asterisk/sounds
 
 volumes:
   db_data:
