@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RoboCaller Minimal</title>
+  <style>
+    body { font-family: sans-serif; max-width: 720px; margin: 20px auto; }
+    .row { display:flex; gap:8px; margin:8px 0; }
+    input, button { padding:6px; }
+    pre { background:#f4f4f4; padding:10px; }
+  </style>
+</head>
+<body>
+  <h1>RoboCaller</h1>
+  <div>
+    <h3>Login</h3>
+    <div class="row">
+      <input id="email" placeholder="email" value="admin@local"/>
+      <input id="password" type="password" placeholder="mot de passe" value="admin"/>
+      <button onclick="login()">Login</button>
+    </div>
+    <div id="role"></div>
+  </div>
+
+  <hr/>
+
+  <div>
+    <h3>Campagnes</h3>
+    <div class="row">
+      <input id="cname" placeholder="Nom"/>
+      <input id="clid" placeholder="Caller ID" value="0123456789"/>
+      <input id="concur" type="number" placeholder="Conc." value="3"/>
+      <input id="pace" type="number" placeholder="Pace/min" value="30"/>
+      <button onclick="createCampaign()">Créer</button>
+    </div>
+    <button onclick="listCampaigns()">Rafraîchir</button>
+    <pre id="campaigns"></pre>
+  </div>
+
+  <div>
+    <h3>Contrôles</h3>
+    <div class="row">
+      <input id="cid" type="number" placeholder="Campaign ID"/>
+      <button onclick="start()">Start</button>
+      <button onclick="pause()">Pause</button>
+      <button onclick="ws()">WebSocket</button>
+    </div>
+    <pre id="feed"></pre>
+  </div>
+
+<script>
+let token = null;
+
+function api(path, opts={}) {
+  opts.headers = Object.assign({"Content-Type":"application/json"}, opts.headers||{});
+  if (token) opts.headers.Authorization = "Bearer " + token;
+  return fetch("http://localhost:8000"+path, opts).then(r=>r.json());
+}
+
+function login(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  api("/auth/login",{method:"POST", body: JSON.stringify({email,password})})
+    .then(j => { token=j.token; document.getElementById('role').innerText = "Role: "+j.role; });
+}
+
+function createCampaign(){
+  const name = document.getElementById('cname').value;
+  const caller_id = document.getElementById('clid').value;
+  const concurrent_limit = parseInt(document.getElementById('concur').value);
+  const pace_per_minute = parseInt(document.getElementById('pace').value);
+  api("/campaigns",{method:"POST", body: JSON.stringify({name,caller_id,concurrent_limit,pace_per_minute})})
+    .then(_ => listCampaigns());
+}
+
+function listCampaigns(){
+  api("/campaigns").then(j => { document.getElementById('campaigns').innerText = JSON.stringify(j,null,2); });
+}
+
+function start(){
+  const cid = parseInt(document.getElementById('cid').value);
+  api(`/campaigns/${cid}/start`,{method:"POST"});
+}
+
+function pause(){
+  const cid = parseInt(document.getElementById('cid').value);
+  api(`/campaigns/${cid}/pause`,{method:"POST"});
+}
+
+function ws(){
+  const cid = parseInt(document.getElementById('cid').value);
+  const sock = new WebSocket(`ws://localhost:8000/ws/campaigns/${cid}`);
+  sock.onmessage = (ev)=> {
+    const prev = document.getElementById('feed').innerText;
+    document.getElementById('feed').innerText = prev + "\n" + ev.data;
+  };
+}
+</script>
+</body>
+</html>

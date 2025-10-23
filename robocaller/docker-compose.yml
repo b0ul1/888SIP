@@ -1,0 +1,80 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: robouser
+      POSTGRES_PASSWORD: robopass
+      POSTGRES_DB: robodb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U robouser -d robodb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  asterisk:
+    image: andrius/asterisk:20
+    volumes:
+      - ./asterisk/pjsip.conf:/etc/asterisk/pjsip.conf
+      - ./asterisk/ari.conf:/etc/asterisk/ari.conf
+      - ./voice/sounds:/var/lib/asterisk/sounds/custom
+    network_mode: service:api # même réseau pour simplifier (évite l'expo de ports)
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: celery -A worker.tasks worker --loglevel=INFO
+    env_file: [.env]
+    depends_on:
+      - api
+      - redis
+      - db
+
+  voice:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: python -m voice.ari_app
+    env_file: [.env]
+    depends_on:
+      - asterisk
+      - api
+
+  frontend:
+    image: nginx:alpine
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
