@@ -7,5 +7,5 @@ passlib[bcrypt]
 pyjwt
 redis
 celery
-asterisk-ari
+ari
 pydantic==2.*

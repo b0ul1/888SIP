@@ -23,7 +23,7 @@ services:
       retries: 10
 
   asterisk:
-    image: andrius/asterisk:20
+    image: andrius/asterisk
     volumes:
       - ./asterisk/pjsip.conf:/etc/asterisk/pjsip.conf
       - ./asterisk/ari.conf:/etc/asterisk/ari.conf
@@ -72,7 +72,7 @@ services:
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
     ports:
-      - "8080:80"
+      - "7331:80"
     depends_on:
       - api
 

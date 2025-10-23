@@ -1,4 +1,5 @@
-import os, ari
+import os
+from asterisk.ari import Client as AriClient
 
 ARI_URL = os.getenv("ARI_URL", "http://asterisk:8088")
 ARI_USER = os.getenv("ARI_USER", "robocall")
