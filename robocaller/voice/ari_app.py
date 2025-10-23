@@ -1,94 +1,88 @@
 import os
-import ari
+import json
+import asyncio
+import websockets
 from datetime import datetime
 from api.models import SessionLocal, Call, Contact
 
-# Configuration ARI
-ARI_URL = os.getenv("ARI_URL", "http://asterisk:8088")
+ARI_URL = os.getenv("ARI_URL", "http://asterisk:8088/ari")
 ARI_USER = os.getenv("ARI_USER", "robocall")
 ARI_PASSWORD = os.getenv("ARI_PASSWORD", "verysecret")
 APP_NAME = os.getenv("ARI_APP_NAME", "press1_app")
 
-cli = ari.connect(ARI_URL, ARI_USER, ARI_PASSWORD)
+async def handle_event(event: dict):
+    """
+    Traite chaque événement reçu via le WebSocket ARI.
+    """
+    etype = event.get("type")
+    channel = event.get("channel", {})
+    chan_id = channel.get("id")
 
-
-@cli.on_event('StasisStart')
-def on_start(event, channel):
-    """Handler appelé quand un appel entre dans l'application ARI."""
-    db = SessionLocal()
-    try:
-        # Récupère les variables passées par le dialplan
-        args = event.get('args', [])
+    if etype == "StasisStart":
+        args = event.get("args", [])
         campaign_id = int(args[0]) if len(args) > 0 else None
         contact_id = int(args[1]) if len(args) > 1 else None
-
-        # Création de l'entrée Call
-        call = Call(
-            campaign_id=campaign_id,
-            contact_id=contact_id,
-            asterisk_channel=channel.id,
-            started_at=datetime.utcnow(),
-            disposition="ANSWERED",
-        )
-        db.add(call)
-        db.commit()
-        db.refresh(call)
-
-        # Réponse et lecture du prompt
-        channel.answer()
-        channel.play(media='sound:custom/intro')
-
-        # Attache les callbacks pour les événements suivants
-        channel.on_event('ChannelDtmfReceived', lambda e, ch: on_dtmf(e, ch, call.id))
-        channel.on_event('ChannelDestroyed', lambda e, ch: on_end(e, ch, call.id))
-
-    except Exception as e:
-        print(f"[ERROR] StasisStart: {e}")
-        db.rollback()
-    finally:
-        db.close()
-
-
-def on_dtmf(event, channel, call_id):
-    """Handler des DTMF reçus (touche 1 = confirmation)."""
-    db = SessionLocal()
-    try:
-        digit = event.get('digit')
-        if digit == '1':
-            call = db.get(Call, call_id)
-            if call:
-                call.dtmf = '1'
-                if call.contact_id:
-                    contact = db.get(Contact, call.contact_id)
-                    if contact:
-                        contact.status = "CONFIRMED"
-                db.commit()
-
-            channel.play(media='sound:custom/thanks')
-            channel.hangup()
-
-    except Exception as e:
-        print(f"[ERROR] on_dtmf: {e}")
-        db.rollback()
-    finally:
-        db.close()
-
-
-def on_end(event, channel, call_id):
-    """Handler appelé à la fin de l'appel."""
-    db = SessionLocal()
-    try:
-        call = db.get(Call, call_id)
-        if call:
-            call.ended_at = datetime.utcnow()
+        db = SessionLocal()
+        try:
+            call = Call(
+                campaign_id=campaign_id,
+                contact_id=contact_id,
+                asterisk_channel=chan_id,
+                started_at=datetime.utcnow(),
+                disposition="ANSWERED",
+            )
+            db.add(call)
             db.commit()
-    except Exception as e:
-        print(f"[ERROR] on_end: {e}")
-        db.rollback()
-    finally:
-        db.close()
+        finally:
+            db.close()
+
+    elif etype == "ChannelDtmfReceived":
+        digit = event.get("digit")
+        if digit == "1":
+            db = SessionLocal()
+            try:
+                call = db.query(Call).filter_by(asterisk_channel=chan_id).first()
+                if call:
+                    call.dtmf = "1"
+                    if call.contact_id:
+                        c = db.query(Contact).get(call.contact_id)
+                        if c:
+                            c.status = "CONFIRMED"
+                    db.commit()
+            finally:
+                db.close()
+
+    elif etype == "ChannelDestroyed":
+        db = SessionLocal()
+        try:
+            call = db.query(Call).filter_by(asterisk_channel=chan_id).first()
+            if call:
+                call.ended_at = datetime.utcnow()
+                db.commit()
+        finally:
+            db.close()
+
+
+async def ari_listener():
+    """
+    Se connecte au WebSocket ARI et écoute tous les événements.
+    """
+    ws_url = (
+        f"ws://asterisk:8088/ari/events?"
+        f"api_key={ARI_USER}:{ARI_PASSWORD}&app={APP_NAME}"
+    )
+    while True:
+        try:
+            async with websockets.connect(ws_url) as ws:
+                print(f"[*] Connected to ARI WebSocket at {ws_url}")
+                async for msg in ws:
+                    event = json.loads(msg)
+                    await handle_event(event)
+        except Exception as e:
+            print(f"[!] ARI WebSocket error: {e}")
+            await asyncio.sleep(5)  # Reconnexion après erreur
 
 
 if __name__ == "__main__":
-    print(f"[*] Connecting to ARI at {ARI_URL} as {ARI_USER}, app={APP_NAME}")
-    cli.run(apps=[APP_NAME])
+    print(f"[*] Starting ARI listener for app '{APP_NAME}'")
+    asyncio.run(ari_listener())

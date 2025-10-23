@@ -36,3 +36,13 @@ def require_role(*roles):
             raise HTTPException(403, "forbidden")
         return payload
     return _dependency
+
+def verify_token(token: str):
+    """Décoder un JWT brut (ex: passé dans ws://.../ws/campaigns/{cid}?token=XXX)."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None

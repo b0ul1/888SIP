@@ -1,11 +1,10 @@
 fastapi
-uvicorn[standard]
+uvicorn
 sqlalchemy
 psycopg2-binary
-python-dotenv
 passlib[bcrypt]
+python-dotenv
 pyjwt
-redis
+redis[asyncio]
 celery
-ari
-pydantic==2.*
+git+https://github.com/lamecarlate/asterisk-ari.git
