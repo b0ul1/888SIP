@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  asterisk:
+    build: ./asterisk
+    container_name: voip-asterisk
+    restart: always
+    volumes:
+      - ./asterisk/configs:/etc/asterisk
+      - ./asterisk/sounds:/var/lib/asterisk/sounds
+    networks:
+      - voip-net
+    ports:
+      - "5060:5060/udp"   # SIP
+      - "5061:5061/tcp"   # SIPS
+      - "8088:8088"       # ARI/HTTP
+    environment:
+      - ARI_USER=ariuser
+      - ARI_PASS=aripass
+
+  backend:
+    build: ./backend
+    container_name: voip-backend
+    restart: always
+    volumes:
+      - ./asterisk/sounds:/var/lib/asterisk/sounds
+    depends_on:
+      - asterisk
+      - db
+    networks:
+      - voip-net
+    environment:
+      - DB_HOST=db
+      - DB_USER=voip
+      - DB_PASS=voip
+      - DB_NAME=voip
+      - GOOGLE_APPLICATION_CREDENTIALS=/usr/src/app/keys/google.json
+
+  frontend:
+    build: ./frontend
+    container_name: voip-frontend
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - voip-net
+    ports:
+      - "3000:3000"
+
+  db:
+    image: postgres:16
+    container_name: voip-db
+    restart: always
+    volumes:
+      - ./db/data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - POSTGRES_USER=voip
+      - POSTGRES_PASSWORD=voip
+      - POSTGRES_DB=voip
+    networks:
+      - voip-net
+
+  nginx:
+    image: nginx:latest
+    container_name: voip-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./certs:/etc/letsencrypt
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - voip-net
+
+networks:
+  voip-net:
+    driver: bridge
