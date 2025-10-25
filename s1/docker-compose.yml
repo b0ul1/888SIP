@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   asterisk:
     build: ./asterisk
@@ -5,7 +7,7 @@ services:
     restart: always
     volumes:
       - ./asterisk/configs:/etc/asterisk
-      - ./asterisk/sounds:/var/lib/asterisk/sounds     # ✅ sons partagés
+      - ./asterisk/sounds:/var/lib/asterisk/sounds
     networks:
       - voip-net
     ports:
@@ -23,8 +25,7 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - ./asterisk/sounds:/var/lib/asterisk/sounds     # ✅ accès aux fichiers TTS générés
-      - ./backend/keys:/usr/src/app/keys               # ✅ monte les clés Google TTS
+      - ./asterisk/sounds:/var/lib/asterisk/sounds
     depends_on:
       - asterisk
       - db

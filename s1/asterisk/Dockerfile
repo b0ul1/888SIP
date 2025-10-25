@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt update && \
-    apt install -y software-properties-common wget curl build-essential && \
+    apt install -y software-properties-common wget curl file build-essential && \
     add-apt-repository universe && \
     apt update && \
     apt install -y asterisk && \
