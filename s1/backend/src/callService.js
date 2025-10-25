@@ -26,7 +26,7 @@ export async function startCall(number, message) {
       endpoint: `PJSIP/${number}`,
       app: 'ttsapp',
       appArgs: ttsFile,
-      callerId: 'AutoDialer <1000>'
+      callerId: 'Twint'
     });
 
     logger.info(`📞 Call started to ${number} using file ${ttsFile}`);
