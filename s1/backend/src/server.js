@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -17,6 +18,7 @@ import {
 
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const server = http.createServer(app);
@@ -29,6 +31,12 @@ await initScheduler();
 
 // API routes
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
+
+app.get('/api/bots', getAllBots);
+app.get('/api/bots/:id', getBotById);
+app.post('/api/bots', createBot);
+app.put('/api/bots/:id', updateBot);
+app.delete('/api/bots/:id', deleteBot);
 
 app.post('/api/call/start', async (req, res) => {
   const { number, text } = req.body;
@@ -45,6 +53,10 @@ app.post('/api/call/start', async (req, res) => {
   }
 });
 
-server.listen(config.port, () => {
-  logger.info(`Backend running on port ${config.port}`);
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+server.listen(config.port, '0.0.0.0', () => {
+  logger.info(`backend running on 0.0.0.0:${config.port}`);
 });

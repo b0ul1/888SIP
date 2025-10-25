@@ -1,0 +1,7 @@
+s1/db/data/
+s1/certs/
+s1/nginx/
+s1/frontend/node_modules/
+s1/frontend/package-lock.json
+s1/frontend/.next/
+s1/backend/node_modules

@@ -22,6 +22,8 @@ services:
     build: ./backend
     container_name: voip-backend
     restart: always
+    ports:
+      - "4000:4000"
     volumes:
       - ./asterisk/sounds:/var/lib/asterisk/sounds
     depends_on:

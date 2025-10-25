@@ -7,7 +7,8 @@ import ActivityLog from '../components/ActivityLog'
 import BotsList from '../components/BotsList'
 import CallChart from '../components/CallChart'
 
-const socket = io('http://localhost:4000')
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+const socket = io(API_URL)
 
 export default function Dashboard() {
   const [logs, setLogs] = useState([])
@@ -27,7 +28,7 @@ export default function Dashboard() {
   }, [])
 
   async function fetchBots() {
-    const res = await fetch('http://localhost:4000/api/bots')
+    const res = await fetch(`${API_URL}/api/bots`)
     if (res.ok) {
       const data = await res.json()
       setBots(data)
@@ -36,10 +37,8 @@ export default function Dashboard() {
 
   async function fetchStats() {
     try {
-      const res = await fetch('http://localhost:4000/api/health')
-      if (res.ok) {
-        setStats(prev => ({ ...prev, active: 1 }))
-      }
+      const res = await fetch(`${API_URL}/health`)
+      if (res.ok) setStats(prev => ({ ...prev, active: 1 }))
     } catch (e) {
       setStats(prev => ({ ...prev, active: 0 }))
     }
